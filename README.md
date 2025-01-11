@@ -23,18 +23,16 @@ Below is a basic usage example:
 ```python
 from securecredentials import SecureCredentials
 
-# Generate a unique new key - This needs to be done only once. 
-# You need to manually store this key in the environment variables, as the package currently does not automate this step.
-unique_key = SecureCredentials.generate_key()
-print(unique_key)
+# Generate & store the unique master key - This needs to be done only once. 
+master_key = SecureCredentials.generate_master_key()
+SecureCredentials.store_master_key(unique_key=master_key)
 
-# Store/Set the secure field - Encrypt and store the string on disk for later retrieval.
+# Encrypt and store the key-value pair on the disk for later retrieval.
 SecureCredentials.set_secure(field='field_name', plaintext='my plaintext string')
-print('Field encrypted and stored')
 
-# Get the secured string - Retrieve the encrypted field as needed.
-password = SecureCredentials.get_secure(field='field_name')
-print(password)
+# Retrieve the encrypted field as needed.
+my_secure_string = SecureCredentials.get_secure(field='field_name')
+print(my_secure_string)
 ```
 
 ## Dependencies
