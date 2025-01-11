@@ -41,14 +41,10 @@ SecureCredentials requires the following Python libraries:
 
 - **cryptography:** For encryption and decryption.
 - **python-dotenv:** To manage environment variables.
-- **json:** For handling data serialization.
-- **pathlib:** For file path operations.
-- **logging:** For debugging and logging operations.
-- **os:** For system-level operations.
 
 ## License
 
-SecureCredentials is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+SecureCredentials is licensed under the Apache License Version 2.0. See the [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
@@ -56,5 +52,5 @@ Contributions are welcome! Feel free to open an issue or submit a pull request f
 
 ## Support
 
-If you encounter issues or have questions, please open an issue in the [GitHub repository](https://github.com/your-repo/securecredentials).
+If you encounter issues or have questions, please open an issue in the [GitHub repository](https://github.com/rohitlal125555/securecredentials/issues).
 
