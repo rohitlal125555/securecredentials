@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "securecredentials"
-version = "1.1"
+version = "1.2"
 authors = [
   { name="Rohit Lal", email="rohitlal.125555@gmail.com"},
 ]
@@ -12,13 +12,38 @@ description = "SecureCredentials is a lightweight Python package that encrypts a
 readme = "README.md"
 requires-python = ">=3.4"
 classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Security",
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+    "Operating System :: OS Independent"
 ]
 dependencies = [
     "cryptography",
     "python-dotenv"
+]
+keywords = [
+    "securecredentials",
+    "encryption",
+    "security",
+    "password store",
+    "encrypted store",
+    "cryptography",
+    "credential manager",
+    "secure storage",
+    "key-value store",
+    "password encryption",
+    "data security",
+    "authentication",
+    "credential encryption",
+    "local encryption",
+    "secure key store",
+    "encrypted credentials",
+    "python security",
+    "secure environment",
+    "secure password management"
 ]
 
 [project.urls]
