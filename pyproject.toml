@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "securecredentials"
-version = "1.2"
+dynamic = ["version"]
 authors = [
   { name="Rohit Lal", email="rohitlal.125555@gmail.com"},
 ]
 description = "SecureCredentials is a lightweight Python package that encrypts and securely stores key-value pairs on disk, enabling easy and secure retrieval."
-readme = "README.md"
+readme = "README_PYPI.md"
 requires-python = ">=3.4"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -45,6 +45,10 @@ keywords = [
     "secure environment",
     "secure password management"
 ]
+
+[tool.hatch.version]
+path = "securecredentials/_version.py"
+
 
 [project.urls]
 Homepage = "https://github.com/rohitlal125555/securecredentials"

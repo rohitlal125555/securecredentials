@@ -35,17 +35,17 @@ pip install securecredentials
 Below is a basic usage example:
 
 ```python
-from securecredentials import SecureCredentials
+import securecredentials as sc
 
 # Generate & store the unique master key - This needs to be done only once. 
-master_key = SecureCredentials.generate_master_key()
-SecureCredentials.store_master_key(unique_key=master_key)
+master_key = sc.generate_master_key()
+sc.store_master_key(unique_key=master_key)
 
 # Encrypt and store the key-value pair on the disk for later retrieval.
-SecureCredentials.set_secure(field='field_name', plaintext='my plaintext string')
+sc.set_secure(field='field_name', plaintext='my plaintext string')
 
 # Retrieve the encrypted field as needed.
-my_secure_string = SecureCredentials.get_secure(field='field_name')
+my_secure_string = sc.get_secure(field='field_name')
 print(my_secure_string)
 ```
 
@@ -58,7 +58,8 @@ SecureCredentials requires the following Python libraries:
 
 ## License
 
-SecureCredentials is licensed under the Apache License Version 2.0. See the [LICENSE](LICENSE) file for details.
+SecureCredentials is licensed under the Apache License Version 2.0. See the 
+[LICENSE](LICENSE) file for details.
 
 ## Contributing
 
@@ -66,5 +67,6 @@ Contributions are welcome! Feel free to open an issue or submit a pull request f
 
 ## Support
 
-If you encounter issues or have questions, please open an issue in the [GitHub repository](https://github.com/rohitlal125555/securecredentials/issues).
+If you encounter issues or have questions, please open an issue in the 
+[GitHub repository](https://github.com/rohitlal125555/securecredentials/issues).
 

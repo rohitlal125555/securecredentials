@@ -10,6 +10,7 @@ git clone https://github.com/rohitlal125555/securecredentials.git
 
 ```bash
 pip install --upgrade build
+pip install twine
 ```
 
 3. Build the package 
@@ -28,5 +29,5 @@ twine check dist/*
 5. (Optional) Push the new build to PYPI. 
 
 ```bash
-twine upload dist/*
+twine upload --repository securecredentials dist/*
 ```

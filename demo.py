@@ -1,16 +1,18 @@
-from securecredentials import SecureCredentials
+import securecredentials as sc
 
 # help function
-# SecureCredentials.help()
+# sc.help()
 
 # generate a new master key
-master_key = SecureCredentials.generate_master_key()
+# master_key = sc.generate_master_key()
+# print(master_key)
 
 # store the master key on the disk
-SecureCredentials.store_master_key(unique_key=master_key)
+# sc.store_master_key(unique_key=master_key)
 
 # encrypt and store the key-value pair
-SecureCredentials.set_secure('password', 'rohit-pass')
+# sc.set_secure('date of birth', 'January 1st 1970')
 
 # retrieve the stored value for key
-secure_field = SecureCredentials.get_secure('password')
+# secure_field = sc.get_secure('date of birth')
+# print(secure_field)
