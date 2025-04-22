@@ -201,7 +201,7 @@ class SecureCredentials:
             # How to use the SecureCredentials module?
             
             # import the package
-            import SecureCredentials as sc
+            import securecredentials as sc
             
             # Generate a new master key - Only needs to be done once in lifetime
             master_key = sc.generate_master_key()
