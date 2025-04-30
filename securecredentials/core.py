@@ -94,8 +94,7 @@ class SecureCredentials:
             user_response = input(
                 ANSITerminal.decorate(
                     text=textwrap.dedent('''
-                            !!! WARNING !!! 
-                            This operation is irreversible and will overwrite any existing master key.
+                            Warning: This operation is irreversible and will overwrite any existing master key.
                             (Typically you only need to run it once during setup.)
                             Data encrypted with the old master key (if any) will no longer decrypt.
                             
@@ -104,7 +103,7 @@ class SecureCredentials:
                     color='yellow',
                     style='bold'
                 ))
-            if str(user_response).lower() not in ['y', 'yes']:
+            if user_response.strip().lower() not in ['y', 'yes']:
                 cls._logger.info('Discarding operation')
                 return
 
@@ -195,7 +194,7 @@ class SecureCredentials:
                         color='yellow',
                         style='bold'
                     ))
-                if str(user_response).lower() not in ['y', 'yes']:
+                if user_response.strip().lower() not in ['y', 'yes']:
                     cls._logger.info('Discarding operation')
                     return
             else:
