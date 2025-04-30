@@ -213,27 +213,30 @@ class SecureCredentials:
     @classmethod
     def help(cls: 'Type[SecureCredentials]') -> None:
         """ Logs helpful instructions on how to use the SecureCredentials module."""
-        cls._logger.info(textwrap.dedent('''
-            # How to use the SecureCredentials module?
-            
-            # import the package
-            import securecredentials as sc
-            
-            # Generate a new master key - Only needs to be done once in lifetime
-            master_key = sc.generate_master_key()
-            
-            # Store the master key on the disk - Only needs to be done once in lifetime
-            sc.store_master_key(unique_key=master_key)
-            >> [TIMESTAMP] - SecureCredentials - INFO - Master key successfully stored on the disk.
-            
-            # Store/Set the secure field - Only needs to be done once per unique field. This encrypts and stores
-            # the string on the disk for later retrieval
-            sc.set_secure(field='date of birth', plaintext='January 1st 1970')
-            >> [TIMESTAMP] - SecureCredentials - INFO - Field: "date of birth" securely encrypted on disk.
-            
-            # Get the secured string - This is the only function you need to call on regular basis, everytime you 
-            # need to retrieve the encrypted fields.
-            my_secure_string = sc.get_secure(field='date_of_birth')
-            >> [TIMESTAMP] - SecureCredentials - INFO - Secure field: "date of birth" found in user db.
-            
-            '''))
+        cls._logger.info(
+            ANSITerminal.decorate(
+                text=textwrap.dedent('''
+                # How to use the SecureCredentials module?
+                
+                # import the package
+                import securecredentials as sc
+                
+                # Generate a new master key - Only needs to be done once in lifetime
+                master_key = sc.generate_master_key()
+                
+                # Store the master key on the disk - Only needs to be done once in lifetime
+                sc.store_master_key(unique_key=master_key)
+                >> [TIMESTAMP] - SecureCredentials - INFO - Master key successfully stored on the disk.
+                
+                # Store/Set the secure field - Only needs to be done once per unique field. This encrypts and stores
+                # the string on the disk for later retrieval
+                sc.set_secure(field='date of birth', plaintext='January 1st 1970')
+                >> [TIMESTAMP] - SecureCredentials - INFO - Field: "date of birth" securely encrypted on disk.
+                
+                # Get the secured string - This is the only function you need to call on regular basis, everytime you 
+                # need to retrieve the encrypted fields.
+                my_secure_string = sc.get_secure(field='date_of_birth')
+                >> [TIMESTAMP] - SecureCredentials - INFO - Secure field: "date of birth" found in user db.'''),
+                color='green',
+                style='bold'
+            ))
