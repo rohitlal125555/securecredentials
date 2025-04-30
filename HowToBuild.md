@@ -1,4 +1,4 @@
-# How to compile/build the SecureCredentials module
+# Steps to build from source
 
 1. Clone the repository 
 
@@ -10,7 +10,6 @@ git clone https://github.com/rohitlal125555/securecredentials.git
 
 ```bash
 pip install --upgrade build
-pip install twine
 ```
 
 3. Build the package 
@@ -20,13 +19,28 @@ pip install twine
 python -m build
 ```
 
-4. (Optional) Check the build files.
+4. Install the package
+
+```bash
+pip install dist/securecredentials-x.x.x-py3-none-any.whl
+```
+
+
+# How to upload to PYPI
+
+1. Make sure you have the latest version of twine.
+
+```bash
+pip install --upgrade twine
+```
+
+2. Check the build files.
 
 ```bash
 twine check dist/*
 ```
 
-5. (Optional) Push the new build to PYPI. 
+3. Push the new build to PYPI. 
 
 ```bash
 twine upload --repository securecredentials dist/*

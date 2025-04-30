@@ -5,8 +5,9 @@ import textwrap
 from pathlib import Path
 from typing import Optional, Type
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv, set_key
+from .utils import ANSITerminal
 
 
 class SecureCredentials:
@@ -90,13 +91,19 @@ class SecureCredentials:
                            'key using "generate_master_key" method.')
 
         if user_confirmation:
-            user_response = input(textwrap.dedent('''
-                !!! WARNING !!! 
-                This operation is irreversible. It needs to be executed only once during package setup.
-                and will overwrite any previous master keys (if it exists).
-                If there are any key-value pairs encrypted using old master key, they will cease to work.
-                Type "Y" to confirm and store the new master key, or type anything else to discard.
-                >> '''))
+            user_response = input(
+                ANSITerminal.decorate(
+                    text=textwrap.dedent('''
+                            !!! WARNING !!! 
+                            This operation is irreversible and will overwrite any existing master key.
+                            (Typically you only need to run it once during setup.)
+                            Data encrypted with the old master key (if any) will no longer decrypt.
+                            
+                            Type "y" to confirm and store the new master key, or anything else to cancel.
+                            >> '''),
+                    color='yellow',
+                    style='bold'
+                ))
             if str(user_response).lower() not in ['y', 'yes']:
                 cls._logger.info('Discarding operation')
                 return
@@ -147,9 +154,16 @@ class SecureCredentials:
                            f'You need to set it first using the "set_secure" method.')
 
         ciphertext = data_dict[field]
-        f = Fernet(key.encode('utf-8'))
-        plaintext = f.decrypt(ciphertext.encode('utf-8'))
-        cls._logger.info(f'Secure field: "{field}" found in user db.')
+
+        try:
+            f = Fernet(key.encode('utf-8'))
+            plaintext = f.decrypt(ciphertext.encode('utf-8'))
+        except InvalidToken as e:
+            raise ValueError(
+                "Decryption failed. This error commonly occurs when the data was encrypted using a different master key."
+            ) from e
+
+        cls._logger.debug(f'Secure field: "{field}" found in user db.')
         return plaintext.decode('utf-8')
 
     @classmethod
@@ -172,12 +186,15 @@ class SecureCredentials:
         if field in data_dict:
             if user_confirmation:
                 cls.__flush_logs()
-                user_response = input(textwrap.dedent(f'''
-                    !!! WARNING !!! 
-                    The field: "{field}" already exists in the user db.
-                    Do you want to override the existing value?
-                    Type "Y" to confirm and store the new master key, or type anything else to discard.
-                    >> '''))
+                user_response = input(
+                    ANSITerminal.decorate(
+                        text=textwrap.dedent(f''' 
+                            Warning: The field "{field}" already exists in the user database.
+                            Type "y" to overwrite its value, or anything else to cancel.
+                            >> '''),
+                        color='yellow',
+                        style='bold'
+                    ))
                 if str(user_response).lower() not in ['y', 'yes']:
                     cls._logger.info('Discarding operation')
                     return
