@@ -40,9 +40,28 @@ SecureCredentials requires the following Python libraries:
 
 - **cryptography:** For encryption and decryption.
 
+
+## Release Notes
+
+For detailed version history, see the [CHANGELOG.md](https://github.com/rohitlal125555/securecredentials/blob/main/CHANGELOG.md) file.
+
+
 ## License
 
-SecureCredentials is licensed under the Apache License Version 2.0. 
+SecureCredentials is licensed under the Apache License Version 2.0. See the 
+[LICENSE](https://github.com/rohitlal125555/securecredentials/blob/main/LICENSE) file for details.
+
+
+## Contributing
+
+Contributions are welcome! Feel free to open an issue or submit a pull request for improvements or feature requests.
+
+
+## Support
+
+If you encounter issues or have questions, please open an issue in the 
+[GitHub repository](https://github.com/rohitlal125555/securecredentials/issues).
+
 
 ### Full Documentation:  
 Full documentation and usage examples are available in the
