@@ -10,7 +10,7 @@ authors = [
 ]
 description = "SecureCredentials is a lightweight Python package that encrypts and securely stores key-value pairs on disk, enabling easy and secure retrieval."
 readme = "README_PYPI.md"
-requires-python = ">=3.4"
+requires-python = ">=3.5"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -22,7 +22,6 @@ classifiers = [
 ]
 dependencies = [
     "cryptography",
-    "python-dotenv"
 ]
 keywords = [
     "securecredentials",

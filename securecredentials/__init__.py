@@ -1,8 +1,8 @@
 from ._version import __version__
 from .core import SecureCredentials
 
-# noinspection PyProtectedMember
-SecureCredentials._initialize()
+# Initialize the SecureCredentials module
+SecureCredentials.initialize()
 
 __all__ = ["__version__"] + [attr for attr in dir(SecureCredentials) if not attr.startswith("_")]
 

@@ -1,8 +1,9 @@
 # SecureCredentials
 
 SecureCredentials is a lightweight Python package designed to securely store key-value pairs, such as passwords 
-or other sensitive information, on disk. By leveraging strong encryption, the package ensures that your sensitive 
-data remains safe while providing convenient access for everyday use.
+or other sensitive information, on disk. By leveraging modern AES-GCM 256-bit encryption and a dual encryption scheme, 
+the package ensures that your sensitive data and encryption keys remain safe, while still providing convenient access 
+for everyday use.
 
 ## Why SecureCredentials Was Created
 This package was created to address two common challenges faced by developers:
@@ -15,12 +16,15 @@ of encrypted credentials, eliminating the need to type them each time.
 
 ## Key Features
 
-- **AES-128 Encryption**: Leverages the industry-standard 128-bit AES algorithm to ensure your data is encrypted 
-and safe.
-- **Local Security**: The AES key and encrypted data is stored locally, ensuring that no sensitive data leaves 
-your system.
-- **Convenience**: The package streamlines the process by enabling automated, secure access to credentials, so 
-you do not have to store them in plaintext or type them in each time you run your scripts.
+- **Dual Encryption Scheme**: Your actual credentials are encrypted with a strong master key, and that master key is 
+itself encrypted using a deterministic AES-GCM 256-bit key derived from your local system environment—ensuring 
+multi-layered protection.
+- **AES-256 Encryption (GCM mode)**: Uses modern AES-GCM encryption with a 256-bit key for both speed and strong 
+cryptographic security.
+- **Local Security**: All keys and encrypted data are stored locally, ensuring that no sensitive data leaves your system.
+- **Convenience**: Automates secure access to stored credentials, removing the need to retype passwords or store 
+them in plaintext.
+- **Cross-Platform**: Works seamlessly across different operating systems, including Windows, Linux and macOS.
 
 ## Installation
 
@@ -39,7 +43,7 @@ import securecredentials as sc
 
 # Generate & store the unique master key - This needs to be done only once. 
 master_key = sc.generate_master_key()
-sc.store_master_key(unique_key=master_key)
+sc.store_master_key(master_key=master_key)
 
 # Encrypt and store the key-value pair on the disk for later retrieval.
 sc.set_secure(field='field_name', plaintext='my plaintext string')
@@ -54,7 +58,6 @@ print(my_secure_string)
 SecureCredentials requires the following Python libraries:
 
 - **cryptography:** For encryption and decryption.
-- **python-dotenv:** To manage environment variables.
 
 ## License
 

@@ -1,74 +1,97 @@
-import sys
-import ctypes
+import os
+import platform
+import getpass
+from typing import Optional, Type
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from .schema_version import MASTER_DB_VERSION
 
-
-class ANSITerminal:
+class KeyHandler:
     """
-    A class to handle ANSI escape sequences for colored terminal output.
+    An internal-use only class to handle the master key storage.
     """
 
-    # Foreground colors
-    FG_CODES = {
-        "red": 31,
-        "yellow": 33,
-        "green": 32,
-        "aqua": 36,
-    }
-
-    # Additional text styles
-    STYLE_CODES = {
-        "bold": 1,
-        "underline": 4,
-    }
-
-    RESET_CODE = 0
+    _salt_size = 16  # 128-bit random salt for KDF
+    _nonce_size = 12  # 96-bit nonce for GCM
+    _vheader_size = len(bytes([MASTER_DB_VERSION]))  # 1 byte for schema version
 
     @classmethod
-    def _enable_ansi_support(cls):
-        """Enable ANSI escape sequence processing on Windows 10+."""
-        if sys.platform == "win32":
-            try:
-                kernel32 = ctypes.windll.kernel32
-                handle = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
-                mode = ctypes.c_ulong()
-                kernel32.GetConsoleMode(handle, ctypes.byref(mode))
-                mode.value |= 0x0004  # ENABLE_VIRTUAL_TERMINAL_PROCESSING
-                kernel32.SetConsoleMode(handle, mode)
-            except (AttributeError, OSError, ctypes.ArgumentError):
-                pass
-            except Exception as e:
-                # Handle any other exceptions that may occur
-                print(f"[ANSITerminal] unexpected error enabling ANSI support: {e!r}", file=sys.stderr)
-
-    @classmethod
-    def is_interactive_terminal(cls):
-        """Return True if stdout is an interactive terminal (not a file or redirected)."""
-        return sys.stdout.isatty()
-
-    @classmethod
-    def decorate(cls, text: str, color: str = None, style: str = None) -> str:
+    def _get_deterministic_kek(cls: 'Type[KeyHandler]', salt: bytes) -> bytes:
         """
-        Wrap text with ANSI codes.
-        :param text: Text for ANSI formatting
-        :param color: one of FG_COLORS keys
-        :param style: one of STYLES keys
+        Generate a 256 bit deterministic Key-Encryption-Key (KEK) based on system/environment identifiers and given salt
+
+        :param salt: random salt for KDF
+        :return: deterministic KEK (bytes)
         """
-        if not cls.is_interactive_terminal():
-            # If not an interactive terminal, return the text without ANSI codes
-            print('Not interactive terminal')
-            return text
-        else:
-            cls._enable_ansi_support()
 
-            ansi_formatting = []
-            if style and style.lower() in cls.STYLE_CODES:
-                ansi_formatting.append(str(cls.STYLE_CODES[style.lower()]))
-            if color and color.lower() in cls.FG_CODES:
-                ansi_formatting.append(str(cls.FG_CODES[color.lower()]))
+        kek_seed = ''.join([
+            platform.node(),  # hostname
+            platform.system(),  # OS name
+            platform.machine(),  # machine type
+            platform.processor(),  # processor name
+            getpass.getuser(),  # username
+        ]).encode()
 
-            if ansi_formatting:
-                start = f"\033[{';'.join(ansi_formatting)}m"
-                end = f"\033[{cls.RESET_CODE}m"
-                return f"{start}{text}{end}"
-            else:
-                return text
+        # Derive 32-byte key using PBKDF2
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100_000,
+            backend=default_backend(),
+        )
+        return kdf.derive(key_material=kek_seed)
+
+    @classmethod
+    def store_key(cls: 'Type[KeyHandler]', key: bytes, path: str) -> None:
+        """
+        encrypt & store the master key using 256 bit deterministic KEK
+
+        :param key: key to store
+        :param path: full path of the file to store the key
+        :return: None
+        """
+
+        schema_version = bytes([MASTER_DB_VERSION])
+        salt = os.urandom(cls._salt_size)
+        aes_key = cls._get_deterministic_kek(salt)
+
+        aes_gcm = AESGCM(aes_key)
+        nonce = os.urandom(cls._nonce_size)
+        encrypted_master_key = aes_gcm.encrypt(nonce=nonce, data=key, associated_data=None)
+
+        with open(path, 'wb') as f:
+            f.write(schema_version + salt + nonce + encrypted_master_key)
+
+    @classmethod
+    def load_key(cls: 'Type[KeyHandler]', path: str) -> bytes:
+        """
+        decrypt & load the master key using 256 bit deterministic KEK
+        :param path: full path of the file to load the key
+        :return: master key (bytes)
+        """
+
+        with open(path, 'rb') as f:
+            blob = f.read()
+
+        # size and order of each header component
+        header_struct = [cls._vheader_size, cls._salt_size, cls._nonce_size]
+
+        # calculate end offsets of each header component
+        header_indexes = [sum(header_struct[:i+1]) for i in range(len(header_struct))]
+
+        version = blob[:header_indexes[0]]
+        # Version functionality can be used in the future to help in migration between different versions of the schema.
+        # if version != bytes([MASTER_DB_VERSION]):
+        #     raise ValueError(f"Unsupported master schema version: {version}")
+
+        aes_key = cls._get_deterministic_kek(salt=blob[header_indexes[0]:header_indexes[1]])
+        aes_gcm = AESGCM(aes_key)
+        master_key = aes_gcm.decrypt(
+            nonce=blob[header_indexes[1]:header_indexes[2]],
+            data=blob[header_indexes[2]:],
+            associated_data=None)
+
+        return master_key

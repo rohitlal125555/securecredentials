@@ -7,7 +7,7 @@ sc.help()
 master_key = sc.generate_master_key()
 
 # store the master key on the disk
-sc.store_master_key(unique_key=master_key)
+sc.store_master_key(master_key=master_key)
 
 # encrypt and store the key-value pair
 sc.set_secure('date of birth', 'January 1st 1970')

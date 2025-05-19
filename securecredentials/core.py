@@ -1,33 +1,47 @@
+import os
 import json
 import logging
-import os
 import textwrap
-from pathlib import Path
 from typing import Optional, Type
+import base64
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from cryptography.fernet import Fernet, InvalidToken
-from dotenv import load_dotenv, set_key
-from .utils import ANSITerminal
+from .helper import ANSITerminal
+from .utils import KeyHandler
+from .schema_version import USER_DB_VERSION
 
 
 class SecureCredentials:
-    _master_keyfile_mapping = 'secure_credentials_key'
+    _logger = None
     _master_key = None
     _master_db_path = None
     _user_db_path = None
-    _logger = None
+    _master_file = 'master.db'
+    _user_file = 'user.db'
 
     @classmethod
-    def _initialize(cls: 'Type[SecureCredentials]', log_level: int = logging.INFO,
-            log_format: str = '%(asctime)s - %(name)s - %(levelname)s - %(message)s') -> None:
-        """ Set up the SecureCredentials environment, configure logging, and initialize directories."""
+    def initialize(cls: 'Type[SecureCredentials]', log_level: Optional[int] = logging.INFO,
+            log_format: Optional[str] = '%(asctime)s - %(name)s - %(levelname)s - %(message)s') -> None:
+        """
+        Initialize the SecureCredentials module by setting up logging, creating directories, and loading the master key.
+
+        :param log_level: logging level (default: logging.INFO)
+        :param log_format: logging format (default: '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        :return: None
+        """
         cls._configure_logging(log_level, log_format)
-        cls._initialize_directories_and_load_env()
-        cls._check_if_master_key_exists()
+        cls._initialize_directories()
+        cls._load_master_key()
 
     @classmethod
     def _configure_logging(cls: 'Type[SecureCredentials]', log_level: int, log_format: str) -> None:
-        """ Configure logging for the SecureCredentials class, with provided log level and format."""
+        """
+        Configures the logging settings for the SecureCredentials module.
+
+        :param log_level: logging level
+        :param log_format: logging format
+        :return: None
+        """
         logger = logging.getLogger(cls.__name__)
 
         if not logger.handlers:  # Prevent adding multiple handlers on repeated setup calls
@@ -40,56 +54,95 @@ class SecureCredentials:
 
     @classmethod
     def __flush_logs(cls: 'Type[SecureCredentials]') -> None:
-        """ Flushes all logs in the logger handlers."""
+        """ Flushes all the log handlers to ensure that all logs are written to the output """
         for handler in cls._logger.handlers:
             handler.flush()
 
     @classmethod
-    def _initialize_directories_and_load_env(cls: 'Type[SecureCredentials]') -> None:
-        """ Initializes directories for storing keys and loads environment variables."""
+    def _initialize_directories(cls: 'Type[SecureCredentials]') -> None:
+        """ Initializes the directories for storing the master key and user database files """
         if os.name == 'nt':
             cls._logger.debug('Initializing the master and user directory. OS detected: Windows')
-            master_db_dir = os.path.join(*[os.getenv('APPDATA'), cls.__name__])
-            user_db_dir = os.path.join(*[os.getenv('LOCALAPPDATA'), cls.__name__])
+            cls._master_db_path = os.path.join(*[os.getenv('APPDATA'), cls.__name__, cls._master_file])
+            cls._user_db_path = os.path.join(*[os.getenv('LOCALAPPDATA'), cls.__name__, cls._user_file])
         elif os.name == 'posix':
             cls._logger.debug('Initializing the master and user directory. OS detected: Unix/Linux')
-            master_db_dir = os.path.join(*[os.path.expanduser('~'), '.config', cls.__name__])
-            user_db_dir = os.path.join(*[os.path.expanduser('~'), '.local/share', cls.__name__])
+            cls._master_db_path = os.path.join(*[os.path.expanduser('~'), '.config', cls.__name__, cls._master_file])
+            cls._user_db_path = os.path.join(*[os.path.expanduser('~'), '.local/share', cls.__name__, cls._user_file])
         else:
             raise OSError(f'Unknown OS type detected. This package is not supported for - "{os.name}" OS.')
 
-        Path(master_db_dir).mkdir(parents=True, exist_ok=True)
-        Path(user_db_dir).mkdir(parents=True, exist_ok=True)
-
-        master_db = os.path.join(master_db_dir, 'master_key.env')
-        user_db = os.path.join(user_db_dir, 'secure_credentials.db')
-
-        load_dotenv(dotenv_path=master_db)
-        cls._logger.debug('Environment variables refreshed.')
-
-        cls._master_db_path = master_db
-        cls._user_db_path = user_db
+        # Create the directories if they do not exist
+        os.makedirs(os.path.dirname(cls._master_db_path), exist_ok=True)
+        os.makedirs(os.path.dirname(cls._user_db_path), exist_ok=True)
 
     @classmethod
-    def _check_if_master_key_exists(cls: 'Type[SecureCredentials]') -> None:
-        """ Check if the master key exists in the environment. Logs a warning if not."""
-        env_key = os.getenv(cls._master_keyfile_mapping)
-        if env_key is None:
-            cls._logger.warning(textwrap.dedent(f'''
-            No secret key found in the environment.  
-            You can generate and store a new master key by "generate_master_key" and "store_master_key" methods.'''))
+    def _load_master_key(cls: 'Type[SecureCredentials]') -> None:
+        """ Load the master key from the disk if it exists. Log a warning if it does not """
+
+        if not os.path.exists(cls._master_db_path):
+            cls._logger.warning(
+                ANSITerminal.decorate(
+                    text=textwrap.dedent('''
+                    No master key found in the environment.  
+                    You can generate and store a new master key by "generate_master_key" and "store_master_key" methods.
+                    '''),
+                    color='yellow',
+                    style='bold'
+                )
+            )
         else:
-            cls._master_key = env_key
-            cls._logger.debug('Successfully read the Master key from disk.')
+            cls._master_key = KeyHandler.load_key(cls._master_db_path)
+            cls._logger.debug('Loaded the Master key from disk')
+
+    @staticmethod
+    def generate_master_key() -> bytes:
+        """ generate a new 256-bit master key for AES-GCM encryption """
+        return os.urandom(32)
+
+    @staticmethod
+    def decrypt(ciphertext: bytes, key: bytes, nonce: bytes, associated_data: Optional[bytes] = None) -> bytes:
+        """
+        Decrypt the given ciphertext using the provided cipher key.
+
+        :param ciphertext: data to be decrypted
+        :param key: decryption key (should be 16, 24 or 32 bytes long)
+        :param nonce: decryption nonce (should be 12 bytes long)
+        :param associated_data: (optional) associated data used for authentication
+        :return: decrypted data (in bytes format)
+        """
+        aes_gcm = AESGCM(key)
+        return aes_gcm.decrypt(nonce, ciphertext, associated_data)
+
+    @staticmethod
+    def encrypt(plaintext: bytes, key: bytes, associated_data: Optional[bytes] = None) -> tuple[bytes, bytes]:
+        """
+        Encrypt the given plaintext using the provided cipher key.
+
+        :param plaintext: data to be encrypted (in bytes format)
+        :param key: encryption key (should be 16, 24 or 32 bytes long)
+        :param associated_data: (optional) associated data used for authentication
+        :return: tuple pair of (encrypted_data, nonce)
+        """
+        aes_gcm = AESGCM(key)
+        nonce = os.urandom(12)  # 96-bit nonce for GCM
+        return aes_gcm.encrypt(nonce=nonce, data=plaintext, associated_data=associated_data), nonce
 
     @classmethod
-    def store_master_key(cls: 'Type[SecureCredentials]', unique_key: str, user_confirmation: bool = True) -> None:
-        """ Store the master key securely after confirming with the user."""
+    def store_master_key(cls: 'Type[SecureCredentials]', master_key: bytes, user_confirmation: bool = True) -> None:
+        """
+        Store the master key on the disk. This method should be called only once during setup.
+
+        :param master_key: master key to be stored (should be 16, 24 or 32 bytes long)
+        :param user_confirmation: flag to skip terminal-based confirmation checks in case of daemon process
+        :return: None
+        """
         cls.__flush_logs()
-        if len(unique_key) != 44:
-            raise KeyError('Fernet key must be 32 base64 characters long. You can generate a unique '
+        if len(master_key) not in (16, 24, 32):
+            raise ValueError('Invalid AES-GCM key length; must be 16, 24, or 32 bytes. You can generate a unique '
                            'key using "generate_master_key" method.')
 
+        # flag to skip terminal-based confirmation checks in case of daemon process
         if user_confirmation:
             user_response = input(
                 ANSITerminal.decorate(
@@ -107,31 +160,42 @@ class SecureCredentials:
                 cls._logger.info('Discarding operation')
                 return
 
-        set_key(cls._master_db_path, cls._master_keyfile_mapping, unique_key)
+        KeyHandler.store_key(key=master_key, path=cls._master_db_path)
+        cls._master_key = master_key
         cls._logger.info('Master key successfully stored on the disk.')
-        cls._master_key = unique_key
 
     @staticmethod
-    def generate_master_key() -> str:
-        """ Generate a new Fernet master key and returns it as a string."""
-        key = Fernet.generate_key()
-        return key.decode('utf-8')
+    def _load_store(path):
+        """
+        Utility function to load a JSON user database from the disk.
+        :param path: path to the user database
+        :return: json object of the user database
+        """
+        with open(path, 'r') as fp:
+            return json.load(fp)
 
     @staticmethod
-    def decrypt(ciphertext: bytes, key: str) -> str:
-        """ Decrypt the given ciphertext using the provided cipher key."""
-        f = Fernet(key.encode('utf-8'))
-        return f.decrypt(ciphertext).decode('utf-8')
-
-    @staticmethod
-    def encrypt(plaintext: str, key: str) -> bytes:
-        """ Encrypts the given plaintext using the provided cipher key."""
-        f = Fernet(key.encode('utf-8'))
-        return f.encrypt(plaintext.encode('utf-8'))
+    def _write_store(path, data):
+        """
+        Utility function to write a JSON user database to the disk.
+        :param path: path to the user database
+        :param data: json database object to be written
+        :return: None
+        """
+        tmp = path + '.tmp'
+        with open(tmp, 'w') as fp:
+            json.dump(data, fp, indent=2)
+        os.replace(tmp, path)
 
     @classmethod
-    def get_secure(cls: 'Type[SecureCredentials]', field: str, key: Optional[str] = None) -> str:
-        """ Retrieves and decrypts a secure field from the user database."""
+    def get_secure(cls: 'Type[SecureCredentials]', field: str, key: Optional[bytes] = None) -> str:
+        """
+        Retrieve the secure field from the user database. This method decrypts the ciphertext using the master key.
+
+        :param field: name of the field to be retrieved
+        :param key: master key to be used for decryption (optional)
+        :return: decrypted plaintext string
+        """
         if key is None:
             if cls._master_key is None:
                 raise KeyError('Cryptography key is neither present in the environment variables, '
@@ -141,33 +205,41 @@ class SecureCredentials:
 
         if not os.path.exists(cls._user_db_path):
             raise FileNotFoundError(f'No user database found at: "{cls._user_db_path}". '
-                                    f'You need to initialize the user database and store the key-value pair by calling '
-                                    f'the "set_secure" method.')
+                                    f'You need to initialize the user database and store the key-value pair first by '
+                                    f'calling the "set_secure" method.')
 
-        with open(cls._user_db_path, 'r') as fp:
-            data_dict_serialized = fp.read()
-        data_dict = json.loads(data_dict_serialized)
-
-        if field not in data_dict:
+        data_dict = cls._load_store(cls._user_db_path)
+        if field not in data_dict['fields']:
             raise KeyError(f'Secure field: "{field}" is not found in the user database. '
                            f'You need to set it first using the "set_secure" method.')
 
-        ciphertext = data_dict[field]
+        cipher_data = data_dict['fields'][field]
+        cls._logger.debug(f'Secure field: "{field}" found in user db.')
 
+        # Decrypt the ciphertext using the master key
         try:
-            f = Fernet(key.encode('utf-8'))
-            plaintext = f.decrypt(ciphertext.encode('utf-8'))
-        except InvalidToken as e:
+            plaintext = cls.decrypt(
+                ciphertext=base64.b64decode(cipher_data['ciphertext'].encode('utf-8')), key=key,
+                nonce=base64.b64decode(cipher_data['nonce'].encode('utf-8')), associated_data=None)
+            return plaintext.decode('utf-8')
+        except Exception as e:
             raise ValueError(
-                "Decryption failed. This error commonly occurs when the data was encrypted using a different master key."
+                'Decryption failed. This error commonly occurs when incorrect/old master key is used to '
+                'decrypt the data. See full stack trace for more details.'
             ) from e
 
-        cls._logger.debug(f'Secure field: "{field}" found in user db.')
-        return plaintext.decode('utf-8')
-
     @classmethod
-    def set_secure(cls: 'Type[SecureCredentials]', field: str, plaintext: str, key: Optional[str] = None, user_confirmation=True) -> None:
-        """ Encrypts and stores a secure field in the user database."""
+    def set_secure(cls: 'Type[SecureCredentials]', field: str, plaintext: str, key: Optional[bytes] = None,
+                   user_confirmation: Optional[bool]=True) -> None:
+        """
+        Encrypt and store the plaintext value for the given field in the user database.
+
+        :param field: name of the field to be stored
+        :param plaintext: plaintext value to be encrypted and stored
+        :param key: master key to be used for encryption (optional)
+        :param user_confirmation: flag to skip terminal-based confirmation checks in case of daemon process
+        :return: None
+        """
         if key is None:
             if cls._master_key is None:
                 raise KeyError('Cryptography key is neither present in the environment variables, '
@@ -176,18 +248,16 @@ class SecureCredentials:
                 key = cls._master_key
 
         if os.path.exists(cls._user_db_path):
-            with open(cls._user_db_path, 'r') as fp:
-                data_dict_serialized = fp.read()
-            data_dict = json.loads(data_dict_serialized)
+            data_dict = cls._load_store(cls._user_db_path)
         else:
-            data_dict = {}
+            data_dict = {'version':USER_DB_VERSION, 'fields': {}}
 
-        if field in data_dict:
+        if field in data_dict['fields']:
             if user_confirmation:
                 cls.__flush_logs()
                 user_response = input(
                     ANSITerminal.decorate(
-                        text=textwrap.dedent(f''' 
+                        text=textwrap.dedent(f'''
                             Warning: The field "{field}" already exists in the user database.
                             Type "y" to overwrite its value, or anything else to cancel.
                             >> '''),
@@ -200,19 +270,18 @@ class SecureCredentials:
             else:
                 cls._logger.info(f'Overwriting existing field: "{field}"')
 
-        f = Fernet(key.encode('utf-8'))
-        ciphertext = f.encrypt(plaintext.encode('utf-8'))
-        data_dict[field] = ciphertext.decode('utf-8')
-        data_dict_serialized = json.dumps(data_dict)
+        ciphertext, nonce = cls.encrypt(plaintext=plaintext.encode('utf-8'), key=key, associated_data=None)
+        data_dict['fields'][field] = {}
+        data_dict['fields'][field]['ciphertext'] = base64.b64encode(ciphertext).decode('utf-8')
+        data_dict['fields'][field]['nonce'] = base64.b64encode(nonce).decode('utf-8')
 
-        with open(cls._user_db_path, 'w') as fp:
-            fp.write(data_dict_serialized)
+        cls._write_store(cls._user_db_path, data_dict)
         cls._logger.info(f'Field: "{field}" securely encrypted on disk.')
 
     # @staticmethod
     @classmethod
     def help(cls: 'Type[SecureCredentials]') -> None:
-        """ Logs helpful instructions on how to use the SecureCredentials module."""
+        """ Display help information for using the SecureCredentials module """
         cls._logger.info(
             ANSITerminal.decorate(
                 text=textwrap.dedent('''
@@ -225,7 +294,7 @@ class SecureCredentials:
                 master_key = sc.generate_master_key()
                 
                 # Store the master key on the disk - Only needs to be done once in lifetime
-                sc.store_master_key(unique_key=master_key)
+                sc.store_master_key(master_key)
                 >> [TIMESTAMP] - SecureCredentials - INFO - Master key successfully stored on the disk.
                 
                 # Store/Set the secure field - Only needs to be done once per unique field. This encrypts and stores
