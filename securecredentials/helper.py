@@ -57,7 +57,6 @@ class ANSITerminal:
         """
         if not cls._is_interactive_terminal():
             # If not an interactive terminal, return the text without ANSI codes
-            print('Not interactive terminal')
             return text
         else:
             cls._enable_ansi_support()

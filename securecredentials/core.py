@@ -5,6 +5,7 @@ import textwrap
 from typing import Optional, Type
 import base64
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.exceptions import InvalidTag
 
 from .helper import ANSITerminal
 from .utils import KeyHandler
@@ -89,10 +90,23 @@ class SecureCredentials:
                     '''),
                     color='yellow',
                     style='bold'
-                )
-            )
+                ))
         else:
-            cls._master_key = KeyHandler.load_key(cls._master_db_path)
+            try:
+                cls._master_key = KeyHandler.load_key(cls._master_db_path)
+            except InvalidTag:
+                cls._logger.warning(
+                    ANSITerminal.decorate(
+                        text=textwrap.dedent('''
+                        Master Key decryption failed: Your system environment (hardware or OS configuration) has 
+                        changed, making the stored key unrecoverable.
+                        To fix this, reset the master key using: "generate_master_key" and "store_master_key" methods.
+                        Note: Previously encrypted fields cannot be recovered after resetting the master key.
+                        '''),
+                        color='yellow',
+                        style='bold'
+                    ))
+
             cls._logger.debug('Loaded the Master key from disk')
 
     @staticmethod
@@ -147,9 +161,9 @@ class SecureCredentials:
             user_response = input(
                 ANSITerminal.decorate(
                     text=textwrap.dedent('''
-                            Warning: This operation is irreversible and will overwrite any existing master key.
-                            (Typically you only need to run it once during setup.)
-                            Data encrypted with the old master key (if any) will no longer decrypt.
+                            Warning: This action is irreversible and will overwrite any existing master key.
+                            (You typically need to do this only once during setup.)
+                            Any data encrypted with the previous master key will become unrecoverable.
                             
                             Type "y" to confirm and store the new master key, or anything else to cancel.
                             >> '''),
@@ -157,7 +171,7 @@ class SecureCredentials:
                     style='bold'
                 ))
             if user_response.strip().lower() not in ['y', 'yes']:
-                cls._logger.info('Discarding operation')
+                cls._logger.info('Discarding action')
                 return
 
         KeyHandler.store_key(key=master_key, path=cls._master_db_path)
@@ -198,7 +212,7 @@ class SecureCredentials:
         """
         if key is None:
             if cls._master_key is None:
-                raise KeyError('Cryptography key is neither present in the environment variables, '
+                raise KeyError('Master key is neither present in the environment variables, '
                                'nor is passed as function parameter.')
             else:
                 key = cls._master_key
@@ -224,8 +238,7 @@ class SecureCredentials:
             return plaintext.decode('utf-8')
         except Exception as e:
             raise ValueError(
-                'Decryption failed. This error commonly occurs when incorrect/old master key is used to '
-                'decrypt the data. See full stack trace for more details.'
+                'Decryption failed. This usually means the master key has changed or is incorrect.'
             ) from e
 
     @classmethod
@@ -242,7 +255,7 @@ class SecureCredentials:
         """
         if key is None:
             if cls._master_key is None:
-                raise KeyError('Cryptography key is neither present in the environment variables, '
+                raise KeyError('Master key is neither present in the environment variables, '
                                'nor is passed as function parameter.')
             else:
                 key = cls._master_key

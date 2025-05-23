@@ -89,6 +89,7 @@ class KeyHandler:
 
         aes_key = cls._get_deterministic_kek(salt=blob[header_indexes[0]:header_indexes[1]])
         aes_gcm = AESGCM(aes_key)
+
         master_key = aes_gcm.decrypt(
             nonce=blob[header_indexes[1]:header_indexes[2]],
             data=blob[header_indexes[2]:],
