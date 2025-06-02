@@ -10,13 +10,16 @@ from cryptography.exceptions import InvalidTag
 from .helper import ANSITerminal
 from .utils import KeyHandler
 from .schema_version import USER_DB_VERSION
+from .exceptions import *
 
 
 class SecureCredentials:
+    _is_loaded = False
     _logger = None
     _master_key = None
     _master_db_path = None
     _user_db_path = None
+    _passphrase = None
     _master_file = 'master.db'
     _user_file = 'user.db'
 
@@ -32,7 +35,6 @@ class SecureCredentials:
         """
         cls._configure_logging(log_level, log_format)
         cls._initialize_directories()
-        cls._load_master_key()
 
     @classmethod
     def _configure_logging(cls: 'Type[SecureCredentials]', log_level: int, log_format: str) -> None:
@@ -71,48 +73,11 @@ class SecureCredentials:
             cls._master_db_path = os.path.join(*[os.path.expanduser('~'), '.config', cls.__name__, cls._master_file])
             cls._user_db_path = os.path.join(*[os.path.expanduser('~'), '.local/share', cls.__name__, cls._user_file])
         else:
-            raise OSError(f'Unknown OS type detected. This package is not supported for - "{os.name}" OS.')
+            raise UnsupportedOSError(f'Unknown OS type detected. This package is not supported for - "{os.name}" OS.')
 
         # Create the directories if they do not exist
         os.makedirs(os.path.dirname(cls._master_db_path), exist_ok=True)
         os.makedirs(os.path.dirname(cls._user_db_path), exist_ok=True)
-
-    @classmethod
-    def _load_master_key(cls: 'Type[SecureCredentials]') -> None:
-        """ Load the master key from the disk if it exists. Log a warning if it does not """
-
-        if not os.path.exists(cls._master_db_path):
-            cls._logger.warning(
-                ANSITerminal.decorate(
-                    text=textwrap.dedent('''
-                    No master key found in the environment.  
-                    You can generate and store a new master key by "generate_master_key" and "store_master_key" methods.
-                    '''),
-                    color='yellow',
-                    style='bold'
-                ))
-        else:
-            try:
-                cls._master_key = KeyHandler.load_key(cls._master_db_path)
-            except InvalidTag:
-                cls._logger.warning(
-                    ANSITerminal.decorate(
-                        text=textwrap.dedent('''
-                        Master Key decryption failed: Your system environment (hardware or OS configuration) has 
-                        changed, making the stored key unrecoverable.
-                        To fix this, reset the master key using: "generate_master_key" and "store_master_key" methods.
-                        Note: Previously encrypted fields cannot be recovered after resetting the master key.
-                        '''),
-                        color='yellow',
-                        style='bold'
-                    ))
-
-            cls._logger.debug('Loaded the Master key from disk')
-
-    @staticmethod
-    def generate_master_key() -> bytes:
-        """ generate a new 256-bit master key for AES-GCM encryption """
-        return os.urandom(32)
 
     @staticmethod
     def decrypt(ciphertext: bytes, key: bytes, nonce: bytes, associated_data: Optional[bytes] = None) -> bytes:
@@ -142,8 +107,26 @@ class SecureCredentials:
         nonce = os.urandom(12)  # 96-bit nonce for GCM
         return aes_gcm.encrypt(nonce=nonce, data=plaintext, associated_data=associated_data), nonce
 
+    @staticmethod
+    def generate_master_key() -> bytes:
+        """ generate a new 256-bit master key for AES-GCM encryption """
+        return os.urandom(32)
+
     @classmethod
-    def store_master_key(cls: 'Type[SecureCredentials]', master_key: bytes, user_confirmation: bool = True) -> None:
+    def set_passphrase(cls: 'Type[SecureCredentials]', passphrase: str) -> None:
+        """
+        Set the passphrase for the master key. This is used to encrypt the master key before storing it on the disk.
+
+        :param passphrase: passphrase to be set
+        :return: None
+        """
+        cls._logger.debug('Setting passphrase for the master key.')
+        cls._passphrase = passphrase
+        cls._logger.debug('Passphrase loaded for master key encryption/decryption.')
+
+    @classmethod
+    def store_master_key(cls: 'Type[SecureCredentials]', master_key: bytes,
+                         user_confirmation: Optional[bool] = True) -> None:
         """
         Store the master key on the disk. This method should be called only once during setup.
 
@@ -153,8 +136,8 @@ class SecureCredentials:
         """
         cls.__flush_logs()
         if len(master_key) not in (16, 24, 32):
-            raise ValueError('Invalid AES-GCM key length; must be 16, 24, or 32 bytes. You can generate a unique '
-                           'key using "generate_master_key" method.')
+            raise InvalidKeyLengthError('Invalid AES-GCM key length; must be 16, 24, or 32 bytes. '
+                                        'You can generate a unique key using "generate_master_key" method.')
 
         # flag to skip terminal-based confirmation checks in case of daemon process
         if user_confirmation:
@@ -174,9 +157,21 @@ class SecureCredentials:
                 cls._logger.info('Discarding action')
                 return
 
-        KeyHandler.store_key(key=master_key, path=cls._master_db_path)
+        KeyHandler.store_key(key=master_key, passphrase=cls._passphrase, path=cls._master_db_path)
         cls._master_key = master_key
         cls._logger.info('Master key successfully stored on the disk.')
+
+    @classmethod
+    def _load_master_key(cls: 'Type[SecureCredentials]') -> None:
+        """ Load the master key from the disk if it exists. Log a warning if it does not """
+
+        if not os.path.exists(cls._master_db_path):
+            raise MasterDatabaseNotFoundError('No master key database found in the system. '
+                           'You can generate and store a new master key by "generate_master_key" and '
+                           '"store_master_key" methods.')
+        else:
+            cls._master_key = KeyHandler.load_key(passphrase=cls._passphrase, path=cls._master_db_path)
+            cls._logger.debug('Loaded the Master key from disk')
 
     @staticmethod
     def _load_store(path):
@@ -212,19 +207,17 @@ class SecureCredentials:
         """
         if key is None:
             if cls._master_key is None:
-                raise KeyError('Master key is neither present in the environment variables, '
-                               'nor is passed as function parameter.')
-            else:
-                key = cls._master_key
+                cls._load_master_key()
+            key = cls._master_key
 
         if not os.path.exists(cls._user_db_path):
-            raise FileNotFoundError(f'No user database found at: "{cls._user_db_path}". '
+            raise UserDatabaseNotFoundError(f'No user database found at: "{cls._user_db_path}". '
                                     f'You need to initialize the user database and store the key-value pair first by '
                                     f'calling the "set_secure" method.')
 
         data_dict = cls._load_store(cls._user_db_path)
         if field not in data_dict['fields']:
-            raise KeyError(f'Secure field: "{field}" is not found in the user database. '
+            raise SecureFieldNotFoundError(f'Secure field: "{field}" is not found in the user database. '
                            f'You need to set it first using the "set_secure" method.')
 
         cipher_data = data_dict['fields'][field]
@@ -233,13 +226,13 @@ class SecureCredentials:
         # Decrypt the ciphertext using the master key
         try:
             plaintext = cls.decrypt(
-                ciphertext=base64.b64decode(cipher_data['ciphertext'].encode('utf-8')), key=key,
-                nonce=base64.b64decode(cipher_data['nonce'].encode('utf-8')), associated_data=None)
+                ciphertext=base64.b64decode(cipher_data['ciphertext']), key=key,
+                nonce=base64.b64decode(cipher_data['nonce']), associated_data=None)
             return plaintext.decode('utf-8')
-        except Exception as e:
-            raise ValueError(
+        except InvalidTag as ite:
+            raise FieldDecryptionError(
                 'Decryption failed. This usually means the master key has changed or is incorrect.'
-            ) from e
+            ) from ite
 
     @classmethod
     def set_secure(cls: 'Type[SecureCredentials]', field: str, plaintext: str, key: Optional[bytes] = None,
@@ -255,10 +248,8 @@ class SecureCredentials:
         """
         if key is None:
             if cls._master_key is None:
-                raise KeyError('Master key is neither present in the environment variables, '
-                               'nor is passed as function parameter.')
-            else:
-                key = cls._master_key
+                cls._load_master_key()
+            key = cls._master_key
 
         if os.path.exists(cls._user_db_path):
             data_dict = cls._load_store(cls._user_db_path)
@@ -291,7 +282,45 @@ class SecureCredentials:
         cls._write_store(cls._user_db_path, data_dict)
         cls._logger.info(f'Field: "{field}" securely encrypted on disk.')
 
-    # @staticmethod
+    @classmethod
+    def clear_database(cls, database: str, user_confirmation: Optional[bool] = True) -> None:
+        """
+        Clear the user or master database based on the provided parameter by removing the respective file on disk.
+        Caution: This will delete all stored secure fields.
+
+        :param database:
+        :param user_confirmation:
+        :return:
+        """
+        if database.lower().strip() == 'master':
+            db_path = cls._master_db_path
+        elif database.lower().strip() == 'user':
+            db_path = cls._user_db_path
+        else:
+            cls._logger.warning('Invalid database type. Ignoring operation.')
+            return
+
+        if user_confirmation:
+            cls.__flush_logs()
+            user_response = input(
+                ANSITerminal.decorate(
+                    text=textwrap.dedent(f'''
+                        Warning: This operation will clear the "{database}" database and delete all stored secure fields.
+                        Press "y" to confirm and clear the database, or anything else to cancel.
+                        >> '''),
+                    color='yellow',
+                    style='bold'
+                ))
+            if user_response.strip().lower() not in ['y', 'yes']:
+                cls._logger.info('Discarding operation')
+                return
+
+        if os.path.exists(db_path):
+            os.remove(db_path)
+            cls._logger.info('User database cleared successfully.')
+        else:
+            cls._logger.warning(f'Database: "{database}" does not exist. Nothing to clear.')
+
     @classmethod
     def help(cls: 'Type[SecureCredentials]') -> None:
         """ Display help information for using the SecureCredentials module """
@@ -319,6 +348,6 @@ class SecureCredentials:
                 # need to retrieve the encrypted fields.
                 my_secure_string = sc.get_secure(field='date_of_birth')
                 >> [TIMESTAMP] - SecureCredentials - INFO - Secure field: "date of birth" found in user db.'''),
-                color='green',
+                color='aqua',
                 style='bold'
             ))
