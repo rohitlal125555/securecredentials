@@ -94,7 +94,8 @@ flowchart TD
     ENC_CREDS --> STORE_CREDS
 
     %% Default Shade
-    classDef default fill:#f5f5f5,stroke:#666,color:#222;
+    classDef default fill:#ffffff,stroke:#000000,color:#000000;
+    linkStyle default stroke:#666,stroke-width:1.5px;
 
     %% Darker Shades
     classDef keyDerivation fill:#e0f0ff,stroke:#4682b4,color:#003366,stroke-width:2px
@@ -103,10 +104,10 @@ flowchart TD
     classDef storageNode fill:#fdfdfd,stroke:#aaa,color:#333,stroke-dasharray: 5 5
 
     %% Darker Shades    
-    %% classDef keyDerivation fill:#a3c4f3,stroke:#4682b4,color:#003366,stroke-width:2px;
-    %% classDef keyMgmt fill:#f7c9a3,stroke:#ff7f50,color:#5c1d00,stroke-width:2px;
-    %% classDef secretMgmt fill:#c8e38b,stroke:#99cc33,color:#335500,stroke-width:2px;
-    %% classDef storageNode fill:#dcdcdc,stroke:#aaa,color:#333,stroke-dasharray:5 5;
+    classDef keyDerivation fill:#a3c4f3,stroke:#4682b4,color:#003366,stroke-width:2px;
+    classDef keyMgmt fill:#f7c9a3,stroke:#ff7f50,color:#5c1d00,stroke-width:2px;
+    classDef secretMgmt fill:#c8e38b,stroke:#99cc33,color:#335500,stroke-width:2px;
+    classDef storageNode fill:#dcdcdc,stroke:#aaa,color:#333,stroke-dasharray:5 5;
 
     class A keyDerivation;
     class B keyMgmt;
