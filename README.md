@@ -53,6 +53,69 @@ my_secure_string = sc.get_secure(field='field_name')
 print(my_secure_string)
 ```
 
+## How it works
+
+```mermaid
+flowchart TD
+ subgraph A["<b>Key Derivation</b>"]
+    direction TB
+        SV["System Variables"]
+        HW["Hardware Info:<br>CPU, Architecture"]
+        SW["Software Info:<br>OS, Username, Hostname"]
+        PP["User Passphrase"]
+        KDF["KDF Function"]
+        DK["Derived AES-256 Key"]
+  end
+ subgraph B["<b>Key Management</b>"]
+    direction TB
+        ENC_MK["Encrypt Master Key<br>(AES-256-GCM)"]
+        MK_FILE[/"Store Encrypted Master Key"/]
+        READ_MK[/"Read Encrypted Master Key"/]
+        DEC_MK["Decrypt Master Key<br>(AES-256-GCM)"]
+  end
+ subgraph C["<b>Secret Management</b>"]
+    direction TB
+        CREDS["Plaintext Credentials"]
+        MK_DEC["Master Key (Decrypted)"]
+        ENC_CREDS["Encrypt/Decrypt Credentials<br>(AES-256-GCM)"]
+        STORE_CREDS["Store Encrypted Credentials"]
+  end
+    SV --> HW & SW
+    HW --> KDF
+    SW --> KDF
+    PP --> KDF
+    KDF --> DK
+    DK --> ENC_MK & DEC_MK
+    ENC_MK --> MK_FILE
+    READ_MK --> DEC_MK
+    DEC_MK --> MK_DEC
+    CREDS --> ENC_CREDS
+    MK_DEC --> ENC_CREDS
+    ENC_CREDS --> STORE_CREDS
+
+    %% Default Shade
+    classDef default fill:#f5f5f5,stroke:#666,color:#222;
+
+    %% Darker Shades
+    classDef keyDerivation fill:#e0f0ff,stroke:#4682b4,color:#003366,stroke-width:2px
+    classDef keyMgmt fill:#fff0e6,stroke:#ff7f50,color:#5c1d00,stroke-width:2px
+    classDef secretMgmt fill:#f5ffe6,stroke:#99cc33,color:#335500,stroke-width:2px
+    classDef storageNode fill:#fdfdfd,stroke:#aaa,color:#333,stroke-dasharray: 5 5
+
+    %% Darker Shades    
+    %% classDef keyDerivation fill:#a3c4f3,stroke:#4682b4,color:#003366,stroke-width:2px;
+    %% classDef keyMgmt fill:#f7c9a3,stroke:#ff7f50,color:#5c1d00,stroke-width:2px;
+    %% classDef secretMgmt fill:#c8e38b,stroke:#99cc33,color:#335500,stroke-width:2px;
+    %% classDef storageNode fill:#dcdcdc,stroke:#aaa,color:#333,stroke-dasharray:5 5;
+
+    class A keyDerivation;
+    class B keyMgmt;
+    class C secretMgmt;
+    class MK_FILE storageNode;
+    class READ_MK storageNode;
+
+```
+
 ## Dependencies
 
 SecureCredentials requires the following Python libraries:
