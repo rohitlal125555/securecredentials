@@ -98,16 +98,16 @@ flowchart TD
     linkStyle default stroke:#666,stroke-width:1.5px;
 
     %% Darker Shades
-    classDef keyDerivation fill:#e0f0ff,stroke:#4682b4,color:#003366,stroke-width:2px
-    classDef keyMgmt fill:#fff0e6,stroke:#ff7f50,color:#5c1d00,stroke-width:2px
-    classDef secretMgmt fill:#f5ffe6,stroke:#99cc33,color:#335500,stroke-width:2px
-    classDef storageNode fill:#fdfdfd,stroke:#aaa,color:#333,stroke-dasharray: 5 5
+    %% classDef keyDerivation fill:#e0f0ff,stroke:#4682b4,color:#003366,stroke-width:2px
+    %% classDef keyMgmt fill:#fff0e6,stroke:#ff7f50,color:#5c1d00,stroke-width:2px
+    %% classDef secretMgmt fill:#f5ffe6,stroke:#99cc33,color:#335500,stroke-width:2px
+    %% classDef storageNode fill:#fdfdfd,stroke:#aaa,color:#333,stroke-dasharray: 5 5
 
     %% Darker Shades    
     classDef keyDerivation fill:#a3c4f3,stroke:#4682b4,color:#003366,stroke-width:2px;
     classDef keyMgmt fill:#f7c9a3,stroke:#ff7f50,color:#5c1d00,stroke-width:2px;
     classDef secretMgmt fill:#c8e38b,stroke:#99cc33,color:#335500,stroke-width:2px;
-    classDef storageNode fill:#dcdcdc,stroke:#aaa,color:#333,stroke-dasharray:5 5;
+    classDef storageNode fill:#fdfdfd,stroke:#888,color:#333,stroke-dasharray: 5 5
 
     class A keyDerivation;
     class B keyMgmt;
